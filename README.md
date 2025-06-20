@@ -66,3 +66,5 @@ Pipeline for variant calling/
 ├── 13_SNP_Retrieval
 
 ```
+
+> NOTE: Make sure to run the commands in the respective directories, and make sure that the reference files are available in the directories where-ever necessary. 
