@@ -68,4 +68,5 @@ Pipeline for variant calling/
 ```
 
 > NOTE-1: Make sure to run the commands in the respective directories, and make sure that the reference files are available in the directories where-ever necessary. 
+
 > NOTE-2: The reference genome used for this project was GRCh 38.
