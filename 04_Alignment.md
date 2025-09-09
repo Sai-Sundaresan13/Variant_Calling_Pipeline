@@ -9,7 +9,23 @@ Open the terminal and navigate to the directory containing all the trimmed FASTQ
 cd /path/to/trimmed_output
 ```
 
-## 2. Test if HISAT2 is Working
+## 2. Download the Reference Files
+
+Download the reference .fasta files using the wget link provided below and index them in order to use then for alignment.
+
+```
+wget https://hgdownload.cse.ucsc.edu/goldenpath/hg38/bigZips/hg38.fa.gz
+gunzip hg38.fa.gz
+```
+
+Index the reference files using the below command:
+
+```
+hisat2-build GRCh38.fasta GRCh38_index
+```
+
+
+## 3. Test if HISAT2 is Working
 
 Run the following command to check if HISAT2 is functioning correctly on a single file:
 
@@ -20,7 +36,7 @@ hisat2 -x /home/sundar/project_PU/trimmed_output_301/GRCh38_index \
 --threads 8
 ```
 
-## 3. Running HISAT2 on Multiple Single-End Files
+## 4. Running HISAT2 on Multiple Single-End Files
 
 To align multiple single-end FASTQ files using a loop:
 
@@ -33,7 +49,7 @@ for file in *.fastq.gz; do
 done
 ```
 
-## 4. Running HISAT2 on Paired-End Files
+## 5. Running HISAT2 on Paired-End Files
 
 Use the following command to align paired-end reads:
 
