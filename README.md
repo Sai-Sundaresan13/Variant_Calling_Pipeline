@@ -1,6 +1,9 @@
 # Variant_Calling_Pipeline
 This repository consists of the bash commands corresponding to Variant Calling, used in my master's thesis titled "A Study on the Impact of Variants on the Structure of Tau protein filaments in Frontotemporal Dementia". 
 
+<img width="2964" height="1324" alt="Pasted image" src="https://github.com/user-attachments/assets/c3f011b5-0ff2-43d1-938b-523175cef004" />
+
+
 Here is a basic summary of all the steps used in this Variant Calling Pipeline: 
 
 ## 1. Data Collection:
