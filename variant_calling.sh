@@ -1,16 +1,24 @@
-ADAPTER_PATH="/home/sundar/trimmomatic_adapters/TruSeq3-PE-2.fa"  # Change this to your adapter file path for trimmomatic runs
-THREADS=8 
-# run this script after entering the directory containing your files
+# ========== USER SETTINGS ==========
+ADAPTER_PATH="path/to/TruSeq3-PE-2.fa"                        # Path to Trimmomatic adapter file
+REF="path/to/hg38.fa"                                         # Path to reference FASTA
+KNOWN_SITES="path/to/Homo_sapiens_assembly38.dbsnp138.vcf"    # Path to known sites VCF for BQSR
+SNPSIFT_JAR="path/to/snpEff/SnpSift.jar"                      # Path to SnpSift jar
+DBSNP="path/to/dbsnp_146.hg38.vcf.gz"                         # Path to dbSNP VCF
+THREADS=8                                                     # Number of threads
+# ====================================
 
-# 1. Fastqc analysis for quality control
-mkdir 1_fastqc_output # run only once to create the folder
-fastqc * -o 1_fastqc_output/ # saves the output files into the folder
 
-# 2. Multiqc
-mkdir 2_multiqc_output
-multiqc * --interactive -o 2_multiqc_output/
+# 1. FastQC - Quality Control
+mkdir -p 1_fastqc_output
+fastqc * -o 1_fastqc_output/
 
-# 3. Adapter trimming using trimmomatic (paired end data) - change parameters as per usage
+
+# 2. MultiQC - Aggregate QC Report
+mkdir -p 2_multiqc_output
+multiqc 1_fastqc_output/ --interactive -o 2_multiqc_output/
+
+
+# 3. Trimmomatic - Adapter Trimming (Paired-End)
 mkdir -p 3_trimmed_output
 for file in *_R1.fastq.gz; do
     base=$(basename "$file" _R1.fastq.gz)
@@ -22,15 +30,16 @@ for file in *_R1.fastq.gz; do
         SLIDINGWINDOW:4:20 MINLEN:36
 done
 
-# 4. Alignment using HISAT2
+
+# 4. HISAT2 - Alignment
 cd 3_trimmed_output
-# download the reference fasta file and index it
+# download the reference file and index it
 wget https://hgdownload.cse.ucsc.edu/goldenpath/hg38/bigZips/hg38.fa.gz
 gunzip hg38.fa.gz
-hisat2-build GRCh38.fasta GRCh38_index # indexing the reference
+hisat2-build hg38.fa hg38_index
 
-mkdir 4_alignment_output
-# run the alignment save the .bam files in an output folder
+# run the command for alignment. sort and index the .bam files
+mkdir -p 4_alignment_output
 for file in *_R1_paired.fq.gz; do
     base=$(basename "$file" _R1_paired.fq.gz)
     hisat2 -x hg38_index \
@@ -42,10 +51,10 @@ for file in *_R1_paired.fq.gz; do
     samtools index "4_alignment_output/${base}.bam"
 done
 
-# 5. Duplicate removal using PICARD
-cd  4_alignment_output
-mkdir 5_picard_output
 
+# 5. Picard - Duplicate Removal
+cd 4_alignment_output
+mkdir -p 5_picard_output
 for file in *.bam; do
     base=$(basename "$file" .bam)
     picard MarkDuplicates \
@@ -53,14 +62,12 @@ for file in *.bam; do
         O="5_picard_output/${base}_dedup.bam" \
         M="5_picard_output/${base}_metrics.txt" \
         REMOVE_DUPLICATES=true
-
     samtools index "5_picard_output/${base}_dedup.bam"
 done
 
-# 6. Add read groups
-# Step 1: Add Read Groups
-mkdir 6_readgroups_output
 
+# 6. Picard - Add Read Groups
+mkdir -p 6_readgroups_output
 for bam in 5_picard_output/*_dedup.bam; do
     base=$(basename "$bam" _dedup.bam)
     picard AddOrReplaceReadGroups \
@@ -73,12 +80,9 @@ for bam in 5_picard_output/*_dedup.bam; do
         RGSM="${base}"
 done
 
-REF="path/to/hg38.fa"                          # <-- Change to your reference path
-KNOWN_SITES="path/to/Homo_sapiens_assembly38.dbsnp138.vcf"
 
-# Step 2: Generate Recalibration Tables
+# 7. GATK - Base Quality Score Recalibration (BQSR)
 mkdir -p 7_bqsr_output
-
 for bam in 6_readgroups_output/*_RG.bam; do
     base=$(basename "$bam" _RG.bam)
     gatk BaseRecalibrator \
@@ -88,8 +92,6 @@ for bam in 6_readgroups_output/*_RG.bam; do
         -O "7_bqsr_output/${base}_recal.table"
 done
 
-
-# Step 3: Apply BQSR
 for bam in 6_readgroups_output/*_RG.bam; do
     base=$(basename "$bam" _RG.bam)
     gatk ApplyBQSR \
@@ -99,13 +101,9 @@ for bam in 6_readgroups_output/*_RG.bam; do
         -O "7_bqsr_output/${base}_recalibrated.bam"
 done
 
-#################################################
-REF="path/to/hg38.fa"  # <-- Change to your reference path
-THREADS=8               # <-- Change to your number of threads
-# ====================================
 
-mkdir 8_haplotypecaller_output
-
+# 8. GATK - Variant Calling with HaplotypeCaller
+mkdir -p 8_haplotypecaller_output
 for bam in 7_bqsr_output/*_recalibrated.bam; do
     base=$(basename "$bam" _recalibrated.bam)
     gatk HaplotypeCaller \
@@ -114,12 +112,10 @@ for bam in 7_bqsr_output/*_recalibrated.bam; do
         -O "8_haplotypecaller_output/${base}.vcf.gz" \
         --native-pair-hmm-threads "${THREADS}"
 done
-############################################
-REF="path/to/hg38.fa"  # <-- Change to your reference path
-# ====================================
 
-mkdir  9_variantfiltration_output
 
+# 9. GATK - Variant Filtration
+mkdir -p 9_variantfiltration_output
 for vcf in 8_haplotypecaller_output/*.vcf.gz; do
     base=$(basename "$vcf" .vcf.gz)
     gatk VariantFiltration \
@@ -131,13 +127,9 @@ for vcf in 8_haplotypecaller_output/*.vcf.gz; do
         --filter-name "MQ_filter" --filter-expression "MQ < 40.0"
 done
 
-#################################################
-SNPSIFT_JAR="path/to/snpEff/SnpSift.jar"      # <-- Change to your SnpSift jar path
-DBSNP="path/to/dbsnp_146.hg38.vcf.gz"         # <-- Change to your dbSNP VCF path
-# ====================================
 
-mkdir 10_annotation_output
-
+# 10. SnpSift - Variant Annotation
+mkdir -p 10_annotation_output
 for vcf in 9_variantfiltration_output/*_filtered.vcf.gz; do
     base=$(basename "$vcf" _filtered.vcf.gz)
     java -jar "${SNPSIFT_JAR}" annotate \
@@ -145,12 +137,12 @@ for vcf in 9_variantfiltration_output/*_filtered.vcf.gz; do
         > "10_annotation_output/${base}_annotated.vcf"
 done
 
-##########################################
+
+# 11. BCFtools - Separate SNPs and Indels
 mkdir -p 11_snps_output
 mkdir -p 11_indels_output
-
 for file in 10_annotation_output/*.vcf; do
     base=$(basename "$file" .vcf)
-    bcftools view -v snps "$file" -o "11_snps_output/${base}_snps.vcf"
-    bcftools view -v indels "$file" -o "11_indels_output/${base}_indels.vcf"
+    bcftools view -v snps "$file" -o "11_snps_output/${base}_snps.vcf" # filter SNPs
+    bcftools view -v indels "$file" -o "11_indels_output/${base}_indels.vcf" # filter Indels
 done
